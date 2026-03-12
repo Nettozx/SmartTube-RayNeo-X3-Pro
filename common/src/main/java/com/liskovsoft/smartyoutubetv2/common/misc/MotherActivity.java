@@ -52,6 +52,7 @@ public class MotherActivity extends FragmentActivity {
     private boolean mIsOculusQuestFixEnabled;
     private boolean mIsFullscreenModeEnabled;
     private boolean mIsBackPressed;
+    private TouchEventInterceptor mTouchEventInterceptor;
 
     public interface OnPermissions {
         void onPermissions(int requestCode, String[] permissions, int[] grantResults);
@@ -59,6 +60,18 @@ public class MotherActivity extends FragmentActivity {
 
     public interface OnResult {
         void onResult(int requestCode, int resultCode, Intent data);
+    }
+
+    /**
+     * Interface for intercepting touch events before the default dispatch chain.
+     * Used by RayNeoInputInterceptor to translate temple gestures to DPAD KeyEvents.
+     */
+    public interface TouchEventInterceptor {
+        /**
+         * Called before the default dispatchTouchEvent handling.
+         * @return true if the event was consumed (skip default handling)
+         */
+        boolean onInterceptTouchEvent(MotionEvent event);
     }
 
     @Override
@@ -115,6 +128,11 @@ public class MotherActivity extends FragmentActivity {
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             mScreensaverManager.enable();
+        }
+
+        // Let the RayNeo interceptor handle temple touch events first
+        if (mTouchEventInterceptor != null && mTouchEventInterceptor.onInterceptTouchEvent(event)) {
+            return true;
         }
 
         try {
@@ -271,8 +289,18 @@ public class MotherActivity extends FragmentActivity {
             float uiScale = MainUIData.instance(context).getUIScale();
             // Take into the account screen orientation (e.g. when running on phone)
             int widthPixels = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
-            float widthRatio = DEFAULT_WIDTH / widthPixels;
-            float density = DEFAULT_DENSITY / widthRatio * uiScale;
+            float density;
+
+            if (widthPixels <= 640) {
+                // RayNeo X3 Pro: 640x480 MicroLED waveguide display with 30° FOV.
+                // Default formula yields density ~0.67 which is unreadably small.
+                // Use mdpi baseline (1.0) to make UI elements legible in AR.
+                density = 1.0f * uiScale;
+            } else {
+                float widthRatio = DEFAULT_WIDTH / widthPixels;
+                density = DEFAULT_DENSITY / widthRatio * uiScale;
+            }
+
             displayMetrics.density = density;
             displayMetrics.scaledDensity = density;
             sCachedDisplayMetrics = displayMetrics;
@@ -366,6 +394,14 @@ public class MotherActivity extends FragmentActivity {
 
     public static DisplayMetrics getCachedDisplayMetrics() {
         return sCachedDisplayMetrics;
+    }
+
+    /**
+     * Set a touch event interceptor for translating hardware-specific input
+     * (e.g., RayNeo temple gestures) into standard KeyEvents.
+     */
+    public void setTouchEventInterceptor(TouchEventInterceptor interceptor) {
+        mTouchEventInterceptor = interceptor;
     }
 
     /**

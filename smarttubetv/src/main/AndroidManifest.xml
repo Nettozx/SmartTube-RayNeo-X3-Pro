@@ -32,7 +32,8 @@
         com.google.android.exoplayer2.testutil,
         com.google.android.exoplayer2.ext.okhttp,
         com.google.firebase.crashlytics,
-        com.google.firebase.iid"/>
+        com.google.firebase.iid,
+        com.ffalcon.mercury.android.sdk"/>
 
     <uses-feature
         android:name="android.hardware.microphone"
@@ -42,7 +43,7 @@
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
 
     <!-- android:usesCleartextTraffic - allow HTTP traffic -->
     <!-- Alt cleartext options: https://stackoverflow.com/questions/45940861/android-8-cleartext-http-traffic-not-permitted -->
@@ -72,6 +73,11 @@
                 android:name="androidx.work.WorkManagerInitializer"
                 tools:node="remove" />
         </provider>
+
+        <!-- RayNeo: Allow the system to recognize and launch the app from the glasses launcher -->
+        <meta-data
+            android:name="com.rayneo.mercury.app"
+            android:value="true" />
 
         <!-- Screen Mirror (e.g. DIAL) for Amazon TV -->
         <!-- Not implemented yet( -->

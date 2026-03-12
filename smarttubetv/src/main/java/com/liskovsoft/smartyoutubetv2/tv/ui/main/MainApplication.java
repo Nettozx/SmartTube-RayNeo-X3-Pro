@@ -85,6 +85,35 @@ public class MainApplication extends MultiDexApplication implements Configuratio
 
         setupGlobalExceptionHandler();
         setupViewManager();
+        initRayNeoSDK();
+    }
+
+    /**
+     * Initialize RayNeo Mercury SDK if running on X3 Pro glasses.
+     * Guarded with try/catch so the app works on regular Android TV devices too.
+     */
+    private void initRayNeoSDK() {
+        try {
+            Class<?> sdkClass = Class.forName("com.ffalcon.mercury.android.sdk.MercurySDK");
+            // Try static init(Application) first
+            try {
+                sdkClass.getMethod("init", android.app.Application.class).invoke(null, this);
+            } catch (Exception e) {
+                // If not static, try getting an instance (singleton pattern)
+                try {
+                    Object instance = sdkClass.getMethod("getInstance").invoke(null);
+                    sdkClass.getMethod("init", android.app.Application.class).invoke(instance, this);
+                } catch (Exception e2) {
+                    // Try with Context parameter instead
+                    sdkClass.getMethod("init", android.content.Context.class).invoke(null, this);
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            // Not running on RayNeo device or SDK not bundled — skip
+        } catch (Throwable e) {
+            // Any other SDK init failure — don't crash the app
+            e.printStackTrace();
+        }
     }
 
     /**

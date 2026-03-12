@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.misc.PlayerKeyTranslator;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler.DoubleBackManager2;
+import com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler.RayNeoInputInterceptor;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.search.tags.SearchTagsActivity;
 
@@ -25,6 +26,7 @@ public abstract class LeanbackActivity extends MotherActivity {
     private ModeSyncManager mModeSyncManager;
     private DoubleBackManager2 mDoubleBackManager;
     private GlobalKeyTranslator mGlobalKeyTranslator;
+    private RayNeoInputInterceptor mRayNeoInputInterceptor;
     private final Runnable sOnFinish = () -> Utils.forceFinishTheApp(this);
 
     @Override
@@ -37,6 +39,12 @@ public abstract class LeanbackActivity extends MotherActivity {
                 new PlayerKeyTranslator(this) :
                 new GlobalKeyTranslator(this);
         mGlobalKeyTranslator.apply();
+
+        // RayNeo X3 Pro: Wire temple touch gestures to DPAD KeyEvents
+        mRayNeoInputInterceptor = new RayNeoInputInterceptor(this);
+        if (mRayNeoInputInterceptor.isActive()) {
+            setTouchEventInterceptor(mRayNeoInputInterceptor::onTouchEvent);
+        }
     }
 
     @Override

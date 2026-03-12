@@ -13,9 +13,11 @@ import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout.ResizeMode;
 import com.google.android.exoplayer2.ui.SubtitleView;
 import com.liskovsoft.sharedutils.helpers.Helpers;
+import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerEngine;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.tv.util.RayNeoDeviceUtil;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
 
 /**
@@ -23,6 +25,7 @@ import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
  * and rendering video.
  */
 public class SurfacePlaybackFragment extends PlaybackSupportFragment {
+    private static final String TAG = SurfacePlaybackFragment.class.getSimpleName();
     private SurfaceWrapper mVideoSurfaceWrapper;
     private AspectRatioFrameLayout mVideoSurfaceRoot;
     private SubtitleView mLeanbackSubtitles;
@@ -31,6 +34,8 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
     private float mAspectRatio;
     private float mPixelRatio = 1.0f;
     private float mVideoAspectRatio;
+    // RayNeo binocular video mirroring support
+    private View mMirroringView;
 
     @Override
     public View onCreateView(
@@ -39,15 +44,25 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
         if (root == null) {
             throw new IllegalStateException("Can't create root of SurfacePlaybackFragment");
         }
-        mVideoSurfaceWrapper = (PlayerTweaksData.instance(getContext()).isTextureViewEnabled() ||
+
+        // On RayNeo X3 Pro, force TextureView mode — MirroringView.setSource() requires TextureView
+        boolean isRayNeo = RayNeoDeviceUtil.isRayNeoDevice();
+        mVideoSurfaceWrapper = (isRayNeo || PlayerTweaksData.instance(getContext()).isTextureViewEnabled() ||
                 PlayerData.instance(getContext()).getRotationAngle() != 0) ?
                 new TextureViewWrapper(getContext(), root) : new SurfaceViewWrapper(getContext(), root);
+
         mVideoSurfaceRoot = root.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.surface_root);
         mVideoSurfaceRoot.addView(mVideoSurfaceWrapper.getSurfaceView(), 0);
         mVideoSurfaceRoot.setAspectRatioListener((targetAspectRatio, naturalAspectRatio, aspectRatioMismatch) -> scaleIfNeeded());
         mLeanbackSubtitles = root.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.leanback_subtitles);
         mSubtitlesPadding = mLeanbackSubtitles.getPaddingLeft();
         setBackgroundType(PlaybackSupportFragment.BG_LIGHT);
+
+        // RayNeo X3 Pro: Inject MirroringView for binocular video fusion
+        if (isRayNeo) {
+            initRayNeoMirroring();
+        }
+
         return root;
     }
 
@@ -75,6 +90,7 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
 
     @Override
     public void onDestroyView() {
+        stopRayNeoMirroring();
         mVideoSurfaceWrapper = null;
         super.onDestroyView();
     }
@@ -230,5 +246,61 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
 
     private float calculateAspectRatio() {
         return (mAspectRatio == 0 ? mVideoAspectRatio : mAspectRatio) * mPixelRatio;
+    }
+
+    /**
+     * Initialize RayNeo MirroringView to duplicate the TextureView content to the right eye.
+     * The left eye sees the TextureView directly; the MirroringView renders a copy for the right eye.
+     */
+    private void initRayNeoMirroring() {
+        try {
+            View surfaceView = mVideoSurfaceWrapper.getSurfaceView();
+            if (!(surfaceView instanceof android.view.TextureView)) {
+                Log.w(TAG, "RayNeo: MirroringView requires TextureView, got " + surfaceView.getClass().getSimpleName());
+                return;
+            }
+
+            // Create MirroringView via reflection to avoid hard compile-time dependency
+            Class<?> mirroringViewClass = Class.forName("com.ffalcon.mercury.android.sdk.ui.wiget.MirroringView");
+            mMirroringView = (View) mirroringViewClass
+                    .getConstructor(android.content.Context.class)
+                    .newInstance(getContext());
+
+            // Add MirroringView as sibling in the same AspectRatioFrameLayout
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT);
+            mVideoSurfaceRoot.addView(mMirroringView, params);
+
+            // Bind: mirroringView.setSource(textureView)
+            mirroringViewClass.getMethod("setSource", android.view.TextureView.class)
+                    .invoke(mMirroringView, (android.view.TextureView) surfaceView);
+
+            // Start mirroring: mirroringView.startMirroring()
+            mirroringViewClass.getMethod("startMirroring").invoke(mMirroringView);
+
+            Log.d(TAG, "RayNeo: MirroringView initialized successfully for binocular video fusion");
+        } catch (Throwable e) {
+            // SDK classes not available or API mismatch — fall back to single-eye rendering
+            Log.w(TAG, "RayNeo: MirroringView setup failed: " + e.getMessage());
+            mMirroringView = null;
+        }
+    }
+
+    /**
+     * Stop mirroring and clean up the MirroringView.
+     */
+    private void stopRayNeoMirroring() {
+        if (mMirroringView != null) {
+            try {
+                mMirroringView.getClass().getMethod("stopMirroring").invoke(mMirroringView);
+            } catch (Throwable e) {
+                    Log.w(TAG, "RayNeo: stopMirroring failed: " + e.getMessage());
+            }
+            if (mVideoSurfaceRoot != null) {
+                mVideoSurfaceRoot.removeView(mMirroringView);
+            }
+            mMirroringView = null;
+        }
     }
 }
