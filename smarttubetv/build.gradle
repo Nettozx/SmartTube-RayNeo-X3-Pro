@@ -41,6 +41,15 @@ if (new File("${projectDir}/google-services.json").exists() && (getGradle().getS
 }
 
 android {
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1'
+            force 'androidx.lifecycle:lifecycle-runtime-ktx:2.5.1'
+            force 'androidx.lifecycle:lifecycle-livedata-ktx:2.5.1'
+            force 'androidx.lifecycle:lifecycle-common:2.5.1'
+            force 'androidx.lifecycle:lifecycle-process:2.5.1'
+        }
+    }
     // FIX: Default interface methods are only supported starting with Android N (--min-api 24)
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -99,6 +108,10 @@ android {
         }
     }
     
+    buildFeatures {
+        viewBinding true
+    }
+
     buildTypes {
         release {
             // Enable minification
@@ -181,7 +194,7 @@ android {
 }
 
 dependencies {
-    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    implementation(fileTree(dir: 'libs', include: ['*.aar']))
 
     implementation 'androidx.leanback:leanback:' + leanbackXVersion
     implementation 'androidx.leanback:leanback-preference:' + leanbackXVersion
