@@ -43,7 +43,9 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
             throw new IllegalStateException("Can't create root of SurfacePlaybackFragment");
         }
 
-        mVideoSurfaceWrapper = (PlayerTweaksData.instance(getContext()).isTextureViewEnabled() ||
+        // On RayNeo X3 Pro, force TextureView mode — SurfaceView hardware layers get stolen by MirroringView and blank the left eye.
+        boolean isRayNeo = RayNeoDeviceUtil.isRayNeoDevice();
+        mVideoSurfaceWrapper = (isRayNeo || PlayerTweaksData.instance(getContext()).isTextureViewEnabled() ||
                 PlayerData.instance(getContext()).getRotationAngle() != 0) ?
                 new TextureViewWrapper(getContext(), root) : new SurfaceViewWrapper(getContext(), root);
 
