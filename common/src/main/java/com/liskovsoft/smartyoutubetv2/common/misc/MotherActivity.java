@@ -291,10 +291,11 @@ public class MotherActivity extends FragmentActivity {
             int widthPixels = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
             float density;
 
-            if (widthPixels <= 640) {
-                // RayNeo X3 Pro: 640x480 MicroLED waveguide display with 30° FOV.
-                // Default formula yields density ~0.67 which is unreadably small.
-                // Use mdpi baseline (1.0) to make UI elements legible in AR.
+            // Detect RayNeo X3 Pro: 1280×480 binocular display (640×480 per eye).
+            // Content is wrapped in a dual-pane layout so each eye sees 640×480.
+            // Use density based on 640px content width for AR legibility.
+            int heightPixels = Math.min(displayMetrics.widthPixels, displayMetrics.heightPixels);
+            if (widthPixels <= 1280 && heightPixels <= 480) {
                 density = 1.0f * uiScale;
             } else {
                 float widthRatio = DEFAULT_WIDTH / widthPixels;

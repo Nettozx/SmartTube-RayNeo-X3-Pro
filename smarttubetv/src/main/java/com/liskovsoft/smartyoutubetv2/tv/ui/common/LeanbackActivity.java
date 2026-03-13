@@ -16,6 +16,7 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler.DoubleBackManager2
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler.RayNeoInputInterceptor;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.search.tags.SearchTagsActivity;
+import com.liskovsoft.smartyoutubetv2.tv.util.RayNeoMirrorHelper;
 
 /**
  * This parent class contains common methods that run in every activity such as search.
@@ -27,6 +28,7 @@ public abstract class LeanbackActivity extends MotherActivity {
     private DoubleBackManager2 mDoubleBackManager;
     private GlobalKeyTranslator mGlobalKeyTranslator;
     private RayNeoInputInterceptor mRayNeoInputInterceptor;
+    private RayNeoMirrorHelper mRayNeoMirrorHelper;
     private final Runnable sOnFinish = () -> Utils.forceFinishTheApp(this);
 
     @Override
@@ -44,6 +46,22 @@ public abstract class LeanbackActivity extends MotherActivity {
         mRayNeoInputInterceptor = new RayNeoInputInterceptor(this);
         if (mRayNeoInputInterceptor.isActive()) {
             setTouchEventInterceptor(mRayNeoInputInterceptor::onTouchEvent);
+        }
+
+        // RayNeo mirror helper is initialized here but wrapping happens in onPostCreate
+        mRayNeoMirrorHelper = new RayNeoMirrorHelper();
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+
+        // RayNeo X3 Pro: Wrap content view for binocular display mirroring.
+        // Must happen AFTER setContentView() which is called by subclass activities
+        // (e.g., PlaybackActivity, BrowseActivity) during their onCreate().
+        // onPostCreate runs after the entire onCreate chain completes.
+        if (mRayNeoMirrorHelper != null) {
+            mRayNeoMirrorHelper.wrapContentView(this);
         }
     }
 
@@ -96,6 +114,9 @@ public abstract class LeanbackActivity extends MotherActivity {
     protected void onDestroy() {
         super.onDestroy();
         mBackgroundManager.onDestroy();
+        if (mRayNeoMirrorHelper != null) {
+            mRayNeoMirrorHelper.destroy();
+        }
     }
 
     @Override
