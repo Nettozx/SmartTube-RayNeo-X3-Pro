@@ -121,6 +121,11 @@ public class MotherActivity extends FragmentActivity {
             mScreensaverManager.enable();
         }
 
+        // Let the RayNeo interceptor handle temple touch events first
+        if (mTouchEventInterceptor != null && mTouchEventInterceptor.onInterceptTouchEvent(event)) {
+            return true;
+        }
+
         return super.dispatchGenericMotionEvent(event);
     }
 
@@ -144,6 +149,12 @@ public class MotherActivity extends FragmentActivity {
             e.printStackTrace();
             return false;
         }
+    }
+
+    private boolean isExternalMouse(MotionEvent ev) {
+        boolean isMouseSource = (ev.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE;
+        boolean isMouseTool = ev.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE;
+        return isMouseSource || isMouseTool;
     }
 
     @SuppressLint("RestrictedApi")
