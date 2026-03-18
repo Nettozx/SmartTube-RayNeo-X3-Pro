@@ -9,6 +9,7 @@ import android.widget.FrameLayout;
 
 import com.ffalcon.mercury.android.sdk.ui.wiget.MirroringView;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
 
 /**
  * Enables binocular display for RayNeo X3 Pro by splitting the 1280×480 screen
@@ -25,7 +26,7 @@ public class RayNeoMirrorHelper {
     private boolean mActive;
 
     public void wrapContentView(Activity activity) {
-        if (!RayNeoDeviceUtil.isRayNeoDevice()) {
+        if (mActive || !RayNeoDeviceUtil.isRayNeoDevice()) {
             return;
         }
 

@@ -86,6 +86,54 @@ public class MainApplication extends MultiDexApplication implements Configuratio
         setupGlobalExceptionHandler();
         setupViewManager();
         initRayNeoSDK();
+        registerRayNeoLifecycleCallbacks();
+    }
+
+    private void registerRayNeoLifecycleCallbacks() {
+        if (!com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil.isRayNeoDevice()) {
+            return;
+        }
+
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            private final java.util.Map<android.app.Activity, com.liskovsoft.smartyoutubetv2.tv.util.RayNeoHardwareManager> mManagers = new java.util.HashMap<>();
+
+            @Override
+            public void onActivityCreated(android.app.Activity activity, android.os.Bundle savedInstanceState) {
+                if (activity instanceof com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity) {
+                    com.liskovsoft.smartyoutubetv2.tv.util.RayNeoHardwareManager manager = new com.liskovsoft.smartyoutubetv2.tv.util.RayNeoHardwareManager(activity);
+                    manager.onCreate(savedInstanceState);
+                    mManagers.put(activity, manager);
+                }
+            }
+
+            @Override
+            public void onActivityStarted(android.app.Activity activity) {
+                com.liskovsoft.smartyoutubetv2.tv.util.RayNeoHardwareManager manager = mManagers.get(activity);
+                if (manager != null) {
+                    manager.onPostCreate(null);
+                }
+            }
+
+            @Override
+            public void onActivityResumed(android.app.Activity activity) {}
+
+            @Override
+            public void onActivityPaused(android.app.Activity activity) {}
+
+            @Override
+            public void onActivityStopped(android.app.Activity activity) {}
+
+            @Override
+            public void onActivitySaveInstanceState(android.app.Activity activity, android.os.Bundle outState) {}
+
+            @Override
+            public void onActivityDestroyed(android.app.Activity activity) {
+                com.liskovsoft.smartyoutubetv2.tv.util.RayNeoHardwareManager manager = mManagers.remove(activity);
+                if (manager != null) {
+                    manager.onDestroy();
+                }
+            }
+        });
     }
 
     private void initRayNeoSDK() {

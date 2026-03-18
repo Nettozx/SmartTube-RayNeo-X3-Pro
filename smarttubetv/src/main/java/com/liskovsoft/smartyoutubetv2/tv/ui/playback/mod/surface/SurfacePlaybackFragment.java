@@ -17,7 +17,7 @@ import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerEngine;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
-import com.liskovsoft.smartyoutubetv2.tv.util.RayNeoDeviceUtil;
+import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
 
 /**

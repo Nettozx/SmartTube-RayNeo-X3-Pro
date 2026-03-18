@@ -298,23 +298,10 @@ public class MotherActivity extends FragmentActivity {
             DisplayMetrics displayMetrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
             float uiScale = MainUIData.instance(context).getUIScale();
-            // Take into the account screen orientation (e.g. when running on phone)
-            int widthPixels = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
-            float density;
 
-            // Detect RayNeo X3 Pro: 1280×480 binocular display (640×480 per eye).
-            // Content is wrapped in a dual-pane layout so each eye sees 640×480.
-            // Use density based on 640px content width for AR legibility.
-            int heightPixels = Math.min(displayMetrics.widthPixels, displayMetrics.heightPixels);
-            if (widthPixels <= 1280 && heightPixels <= 480) {
-                density = 1.0f * uiScale;
-            } else {
-                float widthRatio = DEFAULT_WIDTH / widthPixels;
-                density = DEFAULT_DENSITY / widthRatio * uiScale;
-            }
+            // Centralized RayNeo/TV DPI logic
+            com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil.applyDisplayMetrics(displayMetrics, uiScale);
 
-            displayMetrics.density = density;
-            displayMetrics.scaledDensity = density;
             sCachedDisplayMetrics = displayMetrics;
         }
 

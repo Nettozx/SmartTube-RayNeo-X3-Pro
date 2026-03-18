@@ -1,4 +1,4 @@
-package com.liskovsoft.smartyoutubetv2.tv.util;
+package com.liskovsoft.smartyoutubetv2.common.utils;
 
 import android.os.Build;
 
@@ -19,6 +19,30 @@ public class RayNeoDeviceUtil {
             sIsRayNeoDevice = detectRayNeo();
         }
         return sIsRayNeoDevice;
+    }
+
+    /**
+     * Adjusts DisplayMetrics for AR legibility.
+     * Specifically handles the 1280x480 SBS resolution of RayNeo X3 Pro.
+     */
+    public static void applyDisplayMetrics(android.util.DisplayMetrics metrics, float uiScale) {
+        int widthPixels = Math.max(metrics.widthPixels, metrics.heightPixels);
+        int heightPixels = Math.min(metrics.widthPixels, metrics.heightPixels);
+
+        // Detect RayNeo X3 Pro: 1280×480 binocular display (640×480 per eye).
+        if (widthPixels <= 1280 && heightPixels <= 480) {
+            float density = 1.0f * uiScale;
+            metrics.density = density;
+            metrics.scaledDensity = density;
+            metrics.densityDpi = (int) (160 * uiScale);
+        } else {
+            // Standard Android TV logic (MDPI = 160 DPI)
+            float widthRatio = 1920f / widthPixels; // DEFAULT_WIDTH = 1920f
+            float density = (2.0f / widthRatio) * uiScale; // DEFAULT_DENSITY = 2.0f
+            metrics.density = density;
+            metrics.scaledDensity = density;
+            metrics.densityDpi = (int) (160 * density);
+        }
     }
 
     private static boolean detectRayNeo() {

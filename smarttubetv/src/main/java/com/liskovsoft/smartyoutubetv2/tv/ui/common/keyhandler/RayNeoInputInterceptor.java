@@ -6,11 +6,12 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
-import com.liskovsoft.smartyoutubetv2.tv.util.RayNeoDeviceUtil;
-
 import com.ffalcon.mercury.android.sdk.touch.CommonTouchCallback;
 import com.ffalcon.mercury.android.sdk.touch.FlingArgs;
 import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Intercepts temple touchpad MotionEvents on RayNeo X3 Pro AR glasses and translates
@@ -18,6 +19,13 @@ import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
  */
 public class RayNeoInputInterceptor {
     private static final String TAG = "RayNeoInputInterceptor";
+    private static final float SWIPE_THRESHOLD = 45f;
+    private static final ExecutorService sInputExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.setName("RayNeoInputThread");
+        return t;
+    });
 
     private final Activity mActivity;
     private TouchDispatcher mTouchDispatcher;
@@ -69,10 +77,6 @@ public class RayNeoInputInterceptor {
 
             mTouchDispatcher.onMotionEvent(event, mTouchCallback);
 
-            if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
-                android.util.Log.d(TAG, "ACTION_UP/CANCEL received.");
-            }
-
             return true; // Consume event to prevent default pointer/drag behavior
         } catch (Throwable e) {
             android.util.Log.e(TAG, "Error dispatching touch event: " + e.getMessage(), e);
@@ -86,21 +90,18 @@ public class RayNeoInputInterceptor {
         mTouchCallback = new CommonTouchCallback() {
             @Override
             public boolean onTPClick() {
-                android.util.Log.d(TAG, "onTPClick detected");
                 injectKeyEvent(KeyEvent.KEYCODE_DPAD_CENTER);
                 return true;
             }
 
             @Override
             public boolean onTPDoubleClick() {
-                android.util.Log.d(TAG, "onTPDoubleClick detected");
                 injectKeyEvent(KeyEvent.KEYCODE_BACK);
                 return true;
             }
 
             @Override
             public boolean onTPSlideForward(FlingArgs flingArgs) {
-                android.util.Log.d(TAG, "onTPSlideForward detected (swipe forward)");
                 if (!mInjectedContinuousThisSwipe) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
                 }
@@ -109,7 +110,6 @@ public class RayNeoInputInterceptor {
 
             @Override
             public boolean onTPSlideBackward(FlingArgs flingArgs) {
-                android.util.Log.d(TAG, "onTPSlideBackward detected (swipe backward)");
                 if (!mInjectedContinuousThisSwipe) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
                 }
@@ -118,7 +118,6 @@ public class RayNeoInputInterceptor {
 
             @Override
             public boolean onTPSlideUpwards(FlingArgs flingArgs) {
-                android.util.Log.d(TAG, "onTPSlideUpwards detected (swipe up)");
                 if (!mInjectedContinuousThisSwipe) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_UP);
                 }
@@ -127,7 +126,6 @@ public class RayNeoInputInterceptor {
 
             @Override
             public boolean onTPSlideDownwards(FlingArgs flingArgs) {
-                android.util.Log.d(TAG, "onTPSlideDownwards detected (swipe down)");
                 if (!mInjectedContinuousThisSwipe) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
                 }
@@ -160,14 +158,12 @@ public class RayNeoInputInterceptor {
     }
 
     private void handleContinuous(float delta, boolean vertical) {
-        float threshold = 45f; // Threshold for stability
-        
         if (vertical) {
             float step = delta - mLastDeltaY;
             mLastDeltaY = delta;
             mAccumulatedDeltaY += step;
             
-            if (Math.abs(mAccumulatedDeltaY) > threshold) {
+            if (Math.abs(mAccumulatedDeltaY) > SWIPE_THRESHOLD) {
                 mInjectedContinuousThisSwipe = true;
                 if (mAccumulatedDeltaY > 0) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
@@ -181,7 +177,7 @@ public class RayNeoInputInterceptor {
             mLastDeltaX = delta;
             mAccumulatedDeltaX += step;
 
-            if (Math.abs(mAccumulatedDeltaX) > threshold) {
+            if (Math.abs(mAccumulatedDeltaX) > SWIPE_THRESHOLD) {
                 mInjectedContinuousThisSwipe = true;
                 if (mAccumulatedDeltaX > 0) {
                     injectKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
@@ -194,31 +190,30 @@ public class RayNeoInputInterceptor {
     }
 
     private void injectKeyEvent(int keyCode) {
-        android.util.Log.d(TAG, "Injecting key event: " + keyCode + " using Instrumentation");
+        sInputExecutor.execute(() -> {
+            if (mActivity.isFinishing() || mActivity.isDestroyed()) {
+                return;
+            }
 
-        // Instrumentation must be called from a background thread
-        new Thread(() -> {
             try {
                 // Ensure focus highlight is visible before injecting
                 ensureFocus();
                 
                 android.app.Instrumentation inst = new android.app.Instrumentation();
                 inst.sendKeyDownUpSync(keyCode);
-                
-                android.util.Log.d(TAG, "Instrumentation injection success for " + keyCode);
             } catch (Throwable e) {
-                android.util.Log.e(TAG, "Instrumentation injection failed: " + e.getMessage());
-                
                 // Fallback to direct dispatch on UI thread if instrumentation fails
                 mActivity.runOnUiThread(() -> {
+                    if (mActivity.isFinishing() || mActivity.isDestroyed()) {
+                        return;
+                    }
                     long now = SystemClock.uptimeMillis();
                     KeyEvent downEvent = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, 0, -1, 0, 0, android.view.InputDevice.SOURCE_DPAD);
                     KeyEvent upEvent = new KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode, 0, 0, -1, 0, 0, android.view.InputDevice.SOURCE_DPAD);
-                    boolean consumed = mActivity.dispatchKeyEvent(downEvent);
+                    mActivity.dispatchKeyEvent(downEvent);
                     mActivity.dispatchKeyEvent(upEvent);
-                    android.util.Log.d(TAG, "Fallback dispatch results: consumed=" + consumed);
                 });
             }
-        }).start();
+        });
     }
 }
