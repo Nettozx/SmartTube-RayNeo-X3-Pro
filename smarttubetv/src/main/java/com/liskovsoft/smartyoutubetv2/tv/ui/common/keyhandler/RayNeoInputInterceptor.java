@@ -9,6 +9,7 @@ import android.view.View;
 import com.ffalcon.mercury.android.sdk.touch.CommonTouchCallback;
 import com.ffalcon.mercury.android.sdk.touch.FlingArgs;
 import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
+import com.ffalcon.mercury.android.sdk.util.MyTouchUtils;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,6 +60,11 @@ public class RayNeoInputInterceptor {
             return false;
         }
 
+        // Ignore the left temple touchpad (typically used for system volume/brightness)
+        if (MyTouchUtils.isLeft(event)) {
+            return false;
+        }
+
         // Only process events from a touchscreen or touchpad to prevent swallowing mouse events
         if (!event.isFromSource(android.view.InputDevice.SOURCE_TOUCHSCREEN) && 
             !event.isFromSource(android.view.InputDevice.SOURCE_TOUCHPAD)) {
@@ -90,20 +96,22 @@ public class RayNeoInputInterceptor {
         mTouchCallback = new CommonTouchCallback() {
             @Override
             public boolean onTPClick() {
-                injectKeyEvent(KeyEvent.KEYCODE_DPAD_CENTER);
+                android.util.Log.d(TAG, "onTPClick detected - explicitly injecting click");
+                injectClick();
                 return true;
             }
 
             @Override
             public boolean onTPDoubleClick() {
-                injectKeyEvent(KeyEvent.KEYCODE_BACK);
+                android.util.Log.d(TAG, "onTPDoubleClick detected - injecting BACK");
+                injectKeyEventAsync(KeyEvent.KEYCODE_BACK);
                 return true;
             }
 
             @Override
             public boolean onTPSlideForward(FlingArgs flingArgs) {
                 if (!mInjectedContinuousThisSwipe) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_RIGHT);
                 }
                 return true;
             }
@@ -111,7 +119,7 @@ public class RayNeoInputInterceptor {
             @Override
             public boolean onTPSlideBackward(FlingArgs flingArgs) {
                 if (!mInjectedContinuousThisSwipe) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_LEFT);
                 }
                 return true;
             }
@@ -119,7 +127,7 @@ public class RayNeoInputInterceptor {
             @Override
             public boolean onTPSlideUpwards(FlingArgs flingArgs) {
                 if (!mInjectedContinuousThisSwipe) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_UP);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_UP);
                 }
                 return true;
             }
@@ -127,7 +135,7 @@ public class RayNeoInputInterceptor {
             @Override
             public boolean onTPSlideDownwards(FlingArgs flingArgs) {
                 if (!mInjectedContinuousThisSwipe) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_DOWN);
                 }
                 return true;
             }
@@ -166,9 +174,9 @@ public class RayNeoInputInterceptor {
             if (Math.abs(mAccumulatedDeltaY) > SWIPE_THRESHOLD) {
                 mInjectedContinuousThisSwipe = true;
                 if (mAccumulatedDeltaY > 0) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_DOWN);
                 } else {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_UP);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_UP);
                 }
                 mAccumulatedDeltaY = 0f;
             }
@@ -180,16 +188,42 @@ public class RayNeoInputInterceptor {
             if (Math.abs(mAccumulatedDeltaX) > SWIPE_THRESHOLD) {
                 mInjectedContinuousThisSwipe = true;
                 if (mAccumulatedDeltaX > 0) {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_RIGHT);
                 } else {
-                    injectKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_LEFT);
                 }
                 mAccumulatedDeltaX = 0f;
             }
         }
     }
 
-    private void injectKeyEvent(int keyCode) {
+    private void injectClick() {
+        mActivity.runOnUiThread(() -> {
+            try {
+                ensureFocus();
+                View focus = null;
+                if (mActivity.getWindow() != null) {
+                    focus = mActivity.getWindow().getCurrentFocus();
+                }
+                if (focus != null) {
+                    android.util.Log.d(TAG, "Explicitly clicking focused view: " + focus.getClass().getSimpleName());
+                    boolean clicked = focus.performClick();
+                    if (!clicked) {
+                        android.util.Log.d(TAG, "performClick returned false, falling back to KeyEvent");
+                        injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_CENTER);
+                    }
+                } else {
+                    android.util.Log.d(TAG, "No focused view found, falling back to KeyEvent");
+                    injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_CENTER);
+                }
+            } catch (Throwable e) {
+                android.util.Log.e(TAG, "Error in injectClick: " + e.getMessage());
+                injectKeyEventAsync(KeyEvent.KEYCODE_DPAD_CENTER);
+            }
+        });
+    }
+
+    private void injectKeyEventAsync(int keyCode) {
         sInputExecutor.execute(() -> {
             if (mActivity.isFinishing() || mActivity.isDestroyed()) {
                 return;
@@ -200,7 +234,17 @@ public class RayNeoInputInterceptor {
                 ensureFocus();
                 
                 android.app.Instrumentation inst = new android.app.Instrumentation();
+                
+                // Synchronously force the system out of touch mode so that DPAD_CENTER isn't swallowed
+                // as a "wake up from touch" event.
+                inst.setInTouchMode(false);
+                
                 inst.sendKeyDownUpSync(keyCode);
+                
+                // SmartTube dialogs/menus sometimes prefer ENTER over DPAD_CENTER
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+                    inst.sendKeyDownUpSync(KeyEvent.KEYCODE_ENTER);
+                }
             } catch (Throwable e) {
                 // Fallback to direct dispatch on UI thread if instrumentation fails
                 mActivity.runOnUiThread(() -> {

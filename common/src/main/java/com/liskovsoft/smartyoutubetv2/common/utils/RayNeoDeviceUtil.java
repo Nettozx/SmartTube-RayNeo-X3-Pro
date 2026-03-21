@@ -35,6 +35,10 @@ public class RayNeoDeviceUtil {
             metrics.density = density;
             metrics.scaledDensity = density;
             metrics.densityDpi = (int) (160 * uiScale);
+            // Trick Android into thinking the physical screen is only 640px wide.
+            // This fixes Leanback's HorizontalGridView scroll math, which otherwise
+            // assumes a 1280px screen and breaks left-to-right panning/focus.
+            metrics.widthPixels = widthPixels / 2;
         } else {
             // Standard Android TV logic (MDPI = 160 DPI)
             float widthRatio = 1920f / widthPixels; // DEFAULT_WIDTH = 1920f

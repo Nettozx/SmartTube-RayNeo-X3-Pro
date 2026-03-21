@@ -47,6 +47,24 @@ public class RayNeoHardwareManager {
         }
     }
 
+    public void onResume() {
+        if (!mIsRayNeo) {
+            return;
+        }
+        if (mMirrorHelper != null) {
+            mMirrorHelper.onResume();
+        }
+    }
+
+    public void onPause() {
+        if (!mIsRayNeo) {
+            return;
+        }
+        if (mMirrorHelper != null) {
+            mMirrorHelper.onPause();
+        }
+    }
+
     public void onDestroy() {
         if (mMirrorHelper != null) {
             mMirrorHelper.destroy();

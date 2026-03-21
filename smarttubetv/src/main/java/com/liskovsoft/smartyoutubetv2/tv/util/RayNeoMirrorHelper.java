@@ -22,6 +22,7 @@ public class RayNeoMirrorHelper {
     private static final String TAG = RayNeoMirrorHelper.class.getSimpleName();
 
     private MirroringView mMirrorImageView;
+    private android.widget.ImageView mSnapshotView;
     private View mSourceView;
     private boolean mActive;
 
@@ -37,10 +38,10 @@ public class RayNeoMirrorHelper {
                 return;
             }
 
-            // Get the screen width to calculate half
+            // Get the screen width. Since we overridden metrics.widthPixels to 640 in MotherActivity
+            // to fix Leanback scrolling, dm.widthPixels is ALREADY the half-width.
             DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-            int screenWidth = dm.widthPixels;
-            int halfWidth = screenWidth / 2;
+            int halfWidth = dm.widthPixels; // 640px
 
             // Resize the existing content view to the left half — NO re-parenting!
             mSourceView = contentFrame.getChildAt(0);
@@ -49,15 +50,9 @@ public class RayNeoMirrorHelper {
             contentParams.gravity = Gravity.LEFT;
             mSourceView.setLayoutParams(contentParams);
 
-            // To prevent the UI mirror from overflowing, we must force clipping on the source
-            if (mSourceView instanceof ViewGroup) {
-                ((ViewGroup) mSourceView).setClipChildren(true);
-                ((ViewGroup) mSourceView).setClipToPadding(true);
-            }
-
             // Add official SDK MirroringView as a sibling in the right half
             mMirrorImageView = new MirroringView(activity);
-            mMirrorImageView.setBackgroundColor(0xFF000000);
+            mMirrorImageView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
             FrameLayout.LayoutParams mirrorParams = new FrameLayout.LayoutParams(
                     halfWidth, FrameLayout.LayoutParams.MATCH_PARENT);
             mirrorParams.gravity = Gravity.RIGHT;
@@ -76,6 +71,39 @@ public class RayNeoMirrorHelper {
             e.printStackTrace();
             mActive = false;
         }
+    }
+
+    public void onPause() {
+        if (!mActive || mSourceView == null || mMirrorImageView == null) return;
+        try {
+            if (mSourceView.getWidth() <= 0 || mSourceView.getHeight() <= 0) return;
+            // Take a snapshot of the current source view because MirroringView stops updating in onPause
+            android.graphics.Bitmap snapshot = android.graphics.Bitmap.createBitmap(mSourceView.getWidth(), mSourceView.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(snapshot);
+            mSourceView.draw(canvas);
+
+            if (mSnapshotView == null) {
+                mSnapshotView = new android.widget.ImageView(mSourceView.getContext());
+                mSnapshotView.setLayoutParams(mMirrorImageView.getLayoutParams());
+                mSnapshotView.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+                // Place snapshot directly above MirroringView
+                mSnapshotView.setElevation(mMirrorImageView.getElevation() + 1);
+                ((ViewGroup) mMirrorImageView.getParent()).addView(mSnapshotView);
+            }
+            mSnapshotView.setImageBitmap(snapshot);
+            mSnapshotView.setVisibility(View.VISIBLE);
+            mMirrorImageView.setVisibility(View.INVISIBLE);
+        } catch (Throwable e) {
+            Log.e(TAG, "Failed to create mirror snapshot: " + e.getMessage());
+        }
+    }
+
+    public void onResume() {
+        if (!mActive || mSnapshotView == null || mMirrorImageView == null) return;
+        mSnapshotView.setVisibility(View.GONE);
+        mMirrorImageView.setVisibility(View.VISIBLE);
+        // Free bitmap memory
+        mSnapshotView.setImageBitmap(null);
     }
 
     public void destroy() {
