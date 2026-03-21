@@ -1,22 +1,6 @@
-[<img src="images/badge_fdroid.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/app.smarttube.fdroid/)
-[<img src="images/badge_github.png" alt="Get it on GitHub" height="80">](https://github.com/yuliskov/SmartTube/releases)
-
-# Important announcement about the app
-
-My development environment was infected by unknown malicious software, as a result of which a few builds may have been affected. Once the issue was detected, I secured everything with a full disk wipe, restored a clean setup, and now all builds are scanned with VirusTotal. The F-Droid version will also be verified before release.
-
-Public keys may have been compromised, which is why I am sharing this issue. You can download the new version and the new public key below, and instructions for restoring backups are provided.
-
-No extra actions are required since the app uses **one-time connection codes**. These codes have very limited permissions (for example, they cannot change your password). Still, you can revoke them if you want full peace of mind.
-
-# How to revoke access:
-
-1. Open [myaccount.google.com/security](https://myaccount.google.com/security)
-2. Find **“Your connections to third-party apps & services”**
-3. Tap **“See all connection”** and locate **YouTube TV** or **Google Drive**
-4. Select the app → **“Remove access”**
-
-Please keep built-in security features enabled to stay protected.
+# SmartTube - RayNeo X3 Pro Edition 
+> [!CAUTION]
+> **Community Fork Disclaimer:** This is an unofficial community fork of SmartTube specifically optimized for the **RayNeo X3 Pro** AR glasses. It is **not** an official release from the original SmartTube developer or RayNeo. Use at your own risk.
 
 # SmartTube
   
