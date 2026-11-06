@@ -7,6 +7,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.core.view.ViewCompat;
+
 import com.ffalcon.mercury.android.sdk.ui.wiget.MirroringView;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
@@ -57,7 +59,7 @@ public class RayNeoMirrorHelper {
                     halfWidth, FrameLayout.LayoutParams.MATCH_PARENT);
             mirrorParams.gravity = Gravity.RIGHT;
             mMirrorImageView.setLayoutParams(mirrorParams);
-            mMirrorImageView.setElevation(1000f);
+            ViewCompat.setElevation(mMirrorImageView, 1000f);
             contentFrame.addView(mMirrorImageView);
 
             // Bind it and start mirroring
@@ -87,7 +89,7 @@ public class RayNeoMirrorHelper {
                 mSnapshotView.setLayoutParams(mMirrorImageView.getLayoutParams());
                 mSnapshotView.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
                 // Place snapshot directly above MirroringView
-                mSnapshotView.setElevation(mMirrorImageView.getElevation() + 1);
+                ViewCompat.setElevation(mSnapshotView, ViewCompat.getElevation(mMirrorImageView) + 1);
                 ((ViewGroup) mMirrorImageView.getParent()).addView(mSnapshotView);
             }
             mSnapshotView.setImageBitmap(snapshot);
