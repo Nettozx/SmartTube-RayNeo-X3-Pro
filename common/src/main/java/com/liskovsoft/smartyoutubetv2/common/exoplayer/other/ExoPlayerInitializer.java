@@ -24,6 +24,7 @@ import com.google.android.exoplayer2.upstream.TransferListener;
 import com.liskovsoft.sharedutils.helpers.DeviceHelpers;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
 
 import java.util.UUID;
 
@@ -163,7 +164,8 @@ public class ExoPlayerInitializer {
      * Manage audio focus. E.g. use Spotify when audio is disabled.
      */
     private void setupAudioFocus(SimpleExoPlayer player) {
-        if (player != null && mPlayerTweaksData.isAudioFocusEnabled()) {
+        // RayNeo glasses deny audio focus to SmartTube (requestAudioFocus fails), so the player would stay paused
+        if (player != null && mPlayerTweaksData.isAudioFocusEnabled() && !RayNeoDeviceUtil.isRayNeoDevice()) {
             try {
                 player.setAudioAttributes(getAudioAttributes(), true);
             } catch (SecurityException e) { // uid 10390 not allowed to perform TAKE_AUDIO_FOCUS
