@@ -1,16 +1,21 @@
 package com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler;
 
 import android.app.Activity;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+
+import androidx.core.view.ViewCompat;
 
 import com.ffalcon.mercury.android.sdk.touch.CommonTouchCallback;
 import com.ffalcon.mercury.android.sdk.touch.FlingArgs;
 import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
 import com.ffalcon.mercury.android.sdk.util.MyTouchUtils;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -40,11 +45,15 @@ public class RayNeoInputInterceptor {
     private float mLastDeltaY = 0f;
     private boolean mInjectedContinuousThisSwipe = false;
 
+    private WeakReference<View> mLastFocused;
+
     public RayNeoInputInterceptor(Activity activity) {
         mActivity = activity;
         android.util.Log.d(TAG, "Initializing for Activity: " + activity.getClass().getSimpleName());
         try {
             initDispatcher();
+            // Created from onCreate, possibly before setContentView: touching the decor view now could break window setup
+            new Handler(Looper.getMainLooper()).post(this::trackFocus);
         } catch (Throwable e) {
             android.util.Log.e(TAG, "Failed to init RayNeo TouchDispatcher: " + e.getMessage(), e);
             mInitialized = false;
@@ -151,18 +160,51 @@ public class RayNeoInputInterceptor {
         android.util.Log.d(TAG, "RayNeo TouchDispatcher initialized successfully");
     }
 
-    private void ensureFocus() {
-        mActivity.runOnUiThread(() -> {
-            try {
-                if (mActivity.getWindow() != null && mActivity.getWindow().getDecorView() != null) {
-                    View decorView = mActivity.getWindow().getDecorView();
-                    if (decorView.isInTouchMode()) {
-                        android.util.Log.d(TAG, "Exiting touch mode via requestFocus");
-                        decorView.requestFocus();
-                    }
+    private void trackFocus() {
+        if (mActivity.isFinishing() || mActivity.isDestroyed()) {
+            return;
+        }
+
+        try {
+            View current = mActivity.getWindow().getCurrentFocus();
+            if (current != null) {
+                mLastFocused = new WeakReference<>(current);
+            }
+            mActivity.getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> {
+                if (newFocus != null) {
+                    mLastFocused = new WeakReference<>(newFocus);
                 }
-            } catch (Throwable ignored) {}
-        });
+            });
+        } catch (Throwable e) {
+            android.util.Log.e(TAG, "Failed to track focus: " + e.getMessage());
+        }
+    }
+
+    /**
+     * The temple touchpad reports as a touchscreen, so every touch puts the window into touch mode,
+     * which clears focus from views that aren't focusable in touch mode (e.g. the title bar orbs).
+     * Put focus back on the last focused view so the injected key moves from where the user was.
+     * Must run on the UI thread.
+     */
+    private void restoreFocus() {
+        try {
+            if (mActivity.getWindow() == null) {
+                return;
+            }
+
+            View current = mActivity.getWindow().getCurrentFocus();
+            View last = mLastFocused != null ? mLastFocused.get() : null;
+
+            if (last != null && last != current && ViewCompat.isAttachedToWindow(last) && last.isShown() && last.isFocusable()) {
+                android.util.Log.d(TAG, "Restoring focus to " + last.getClass().getSimpleName());
+                boolean focusableInTouchMode = last.isFocusableInTouchMode();
+                last.setFocusableInTouchMode(true);
+                last.requestFocus();
+                last.setFocusableInTouchMode(focusableInTouchMode);
+            } else if (current == null) {
+                mActivity.getWindow().getDecorView().requestFocus();
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void handleContinuous(float delta, boolean vertical) {
@@ -206,7 +248,7 @@ public class RayNeoInputInterceptor {
     private void injectClick() {
         mActivity.runOnUiThread(() -> {
             try {
-                ensureFocus();
+                restoreFocus();
                 View focus = null;
                 if (mActivity.getWindow() != null) {
                     focus = mActivity.getWindow().getCurrentFocus();
@@ -236,10 +278,10 @@ public class RayNeoInputInterceptor {
             }
 
             try {
-                // Ensure focus highlight is visible before injecting
-                ensureFocus();
-                
                 android.app.Instrumentation inst = new android.app.Instrumentation();
+
+                // Synchronously, so focus is back in place before the key is dispatched
+                inst.runOnMainSync(this::restoreFocus);
                 
                 // Synchronously force the system out of touch mode so that DPAD_CENTER isn't swallowed
                 // as a "wake up from touch" event.
