@@ -23,6 +23,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.Restore
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.RestoreTrackSelector.TrackSelectorCallback;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class TrackSelectorManager implements TrackSelectorCallback {
     private final Context mContext;
     public static final int RENDERER_INDEX_UNKNOWN = -1;
     public static final int RENDERER_INDEX_VIDEO = 0;
+    private static final int RAYNEO_MAX_VIDEO_HEIGHT = 720;
     public static final int RENDERER_INDEX_AUDIO = 1;
     public static final int RENDERER_INDEX_SUBTITLE = 2;
     private static final String TAG = TrackSelectorManager.class.getSimpleName();
@@ -210,6 +212,12 @@ public class TrackSelectorManager implements TrackSelectorCallback {
                 }
 
                 if (!PlayerTweaksData.instance(mContext).isAllFormatsUnlocked() && !Utils.isFormatSupported(mediaTrack)) {
+                    continue;
+                }
+
+                // RayNeo glasses show 640x480 per eye: higher formats only add decoding load and bandwidth
+                if (rendererIndex == RENDERER_INDEX_VIDEO && RayNeoDeviceUtil.isRayNeoDevice()
+                        && TrackSelectorUtil.getRealHeight(format) > RAYNEO_MAX_VIDEO_HEIGHT) {
                     continue;
                 }
 
