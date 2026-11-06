@@ -18,6 +18,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download RayNeo Mercury SDK
+        env:
+          SDK_URL: https://1105412697-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2Fb2gO457cPlXbg9GrRxvn%2Fuploads%2FnP1mdfz8a0e3HKFRzBRd%2FMercuryAndroidSDK-v0.2.6-20260310143142_94a01a90.aar?alt=media&token=0e2a9744-0fdc-4f75-8087-95c4a853fe3e
+          SDK_SHA256: 5d408e2c5d80e8ae746c42abbda50012b50617005adfeb397661bec9c9be2676
+        run: |
+          curl -fsSL --retry 3 -o smarttubetv/libs/MercuryAndroidSDK-v0.2.6.aar "$SDK_URL"
+          echo "$SDK_SHA256  smarttubetv/libs/MercuryAndroidSDK-v0.2.6.aar" | sha256sum -c -
+
       - name: Set up JDK 17
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:

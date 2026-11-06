@@ -71,3 +71,6 @@ tmp/
 fabric.properties
 *BAK.java
 hs_err_pid*.log
+
+# RayNeo Mercury SDK (downloaded by CI, see .github/workflows/CI.yml)
+smarttubetv/libs/*.aar
