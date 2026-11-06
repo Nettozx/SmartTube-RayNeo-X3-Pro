@@ -1,11 +1,13 @@
 package com.liskovsoft.smartyoutubetv2.tv.ui.common.keyhandler;
 
 import android.app.Activity;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.core.view.ViewCompat;
 import androidx.leanback.widget.TitleView;
 
 import com.ffalcon.mercury.android.sdk.touch.CommonTouchCallback;
@@ -13,8 +15,11 @@ import com.ffalcon.mercury.android.sdk.touch.FlingArgs;
 import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
 import com.ffalcon.mercury.android.sdk.util.MyTouchUtils;
 
+import java.lang.ref.WeakReference;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Intercepts temple touchpad MotionEvents on RayNeo X3 Pro AR glasses and translates
@@ -44,6 +49,7 @@ public class RayNeoInputInterceptor {
     // Title bar (search/account orbs): one step per swipe, or the burst overshoots into the rows
     private volatile boolean mFocusInTitleBar = false;
     private boolean mOneStepSwipe = false;
+    private WeakReference<View> mLastFocused;
 
     public RayNeoInputInterceptor(Activity activity) {
         mActivity = activity;
@@ -164,18 +170,52 @@ public class RayNeoInputInterceptor {
         android.util.Log.d(TAG, "RayNeo TouchDispatcher initialized successfully");
     }
 
+    /**
+     * The temple touchpad reports as a touchscreen, so each touch puts the window into touch mode,
+     * which clears focus from views not focusable in touch mode (e.g. the title bar orbs).
+     * Requesting focus on the decor view then lands on a default view (the first video), so put
+     * focus back on the view that had it after the last injected key instead.
+     * Runs inline on the UI thread; from other threads, waits until it has run.
+     */
     private void ensureFocus() {
-        mActivity.runOnUiThread(() -> {
+        Runnable restore = () -> {
             try {
-                if (mActivity.getWindow() != null && mActivity.getWindow().getDecorView() != null) {
-                    View decorView = mActivity.getWindow().getDecorView();
-                    if (decorView.isInTouchMode()) {
-                        android.util.Log.d(TAG, "Exiting touch mode via requestFocus");
-                        decorView.requestFocus();
-                    }
+                if (mActivity.getWindow() == null || mActivity.getWindow().getDecorView() == null) {
+                    return;
+                }
+
+                View decorView = mActivity.getWindow().getDecorView();
+                if (!decorView.isInTouchMode()) {
+                    return;
+                }
+
+                View last = mLastFocused != null ? mLastFocused.get() : null;
+                if (last != null && ViewCompat.isAttachedToWindow(last) && last.isShown() && last.isFocusable()) {
+                    android.util.Log.d(TAG, "Exiting touch mode, restoring focus to " + last.getClass().getName());
+                    boolean focusableInTouchMode = last.isFocusableInTouchMode();
+                    last.setFocusableInTouchMode(true);
+                    last.requestFocus();
+                    last.setFocusableInTouchMode(focusableInTouchMode);
+                } else {
+                    android.util.Log.d(TAG, "Exiting touch mode via requestFocus");
+                    decorView.requestFocus();
                 }
             } catch (Throwable ignored) {}
+        };
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            restore.run();
+            return;
+        }
+
+        CountDownLatch done = new CountDownLatch(1);
+        mActivity.runOnUiThread(() -> {
+            restore.run();
+            done.countDown();
         });
+        try {
+            done.await(300, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ignored) {}
     }
 
     private void handleContinuous(float delta, boolean vertical) {
@@ -228,6 +268,9 @@ public class RayNeoInputInterceptor {
             }
         }
         mFocusInTitleBar = inTitleBar;
+        if (focus != null) {
+            mLastFocused = new WeakReference<>(focus);
+        }
         android.util.Log.d(TAG, "Focus after key: " + (focus != null ? focus.getClass().getSimpleName() : "none") + (inTitleBar ? " (title bar)" : ""));
     }
 
