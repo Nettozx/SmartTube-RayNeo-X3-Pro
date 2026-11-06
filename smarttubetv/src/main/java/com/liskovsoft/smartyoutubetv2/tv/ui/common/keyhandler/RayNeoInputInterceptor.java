@@ -167,6 +167,12 @@ public class RayNeoInputInterceptor {
 
     private void handleContinuous(float delta, boolean vertical) {
         if (vertical) {
+            // One step per vertical swipe: a burst of DPAD_UP/DOWN races focus through
+            // the sidebar, and SmartTube opens every section it lands on.
+            if (mInjectedContinuousThisSwipe) {
+                return;
+            }
+
             float step = delta - mLastDeltaY;
             mLastDeltaY = delta;
             mAccumulatedDeltaY += step;
