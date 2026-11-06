@@ -96,6 +96,13 @@ public class RayNeoInputInterceptor {
         mTouchCallback = new CommonTouchCallback() {
             @Override
             public boolean onTPClick() {
+                // The SDK also reports short swipes as a click (~300ms after touch down).
+                // Ignore it if this touch already moved focus, or swiping onto e.g. the search orb opens it.
+                if (mInjectedContinuousThisSwipe) {
+                    android.util.Log.d(TAG, "onTPClick ignored - touch was a swipe");
+                    return true;
+                }
+
                 android.util.Log.d(TAG, "onTPClick detected - explicitly injecting click");
                 injectClick();
                 return true;
