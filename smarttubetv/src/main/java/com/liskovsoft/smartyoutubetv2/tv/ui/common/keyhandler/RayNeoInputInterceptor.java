@@ -66,8 +66,8 @@ public class RayNeoInputInterceptor {
         }
 
         // Only process events from a touchscreen or touchpad to prevent swallowing mouse events
-        if (!event.isFromSource(android.view.InputDevice.SOURCE_TOUCHSCREEN) && 
-            !event.isFromSource(android.view.InputDevice.SOURCE_TOUCHPAD)) {
+        if ((event.getSource() & android.view.InputDevice.SOURCE_TOUCHSCREEN) != android.view.InputDevice.SOURCE_TOUCHSCREEN && 
+            (event.getSource() & android.view.InputDevice.SOURCE_TOUCHPAD) != android.view.InputDevice.SOURCE_TOUCHPAD) {
             return false;
         }
 
