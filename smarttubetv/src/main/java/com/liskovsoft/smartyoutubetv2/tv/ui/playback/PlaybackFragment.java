@@ -65,6 +65,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.Restore
 import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.RayNeoDeviceUtil;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.adapter.VideoGroupObjectAdapter;
@@ -258,7 +259,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     public void onDispatchTouchEvent(MotionEvent event) {
-        if (mDoubleTapPlayerAdapter != null && !isOverlayShown()) {
+        // RayNeo: the temple touchpad's double tap is Back (RayNeoInputInterceptor), don't also seek on it
+        if (mDoubleTapPlayerAdapter != null && !isOverlayShown() && !RayNeoDeviceUtil.isRayNeoDevice()) {
             boolean handled = mDoubleTapPlayerAdapter.onTouchEvent(event);
 
             if (handled)
