@@ -259,8 +259,13 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     public void onDispatchTouchEvent(MotionEvent event) {
-        // RayNeo: the temple touchpad's double tap is Back (RayNeoInputInterceptor), don't also seek on it
-        if (mDoubleTapPlayerAdapter != null && !isOverlayShown() && !RayNeoDeviceUtil.isRayNeoDevice()) {
+        // RayNeo: RayNeoInputInterceptor turns temple touches into keys (double tap = Back). Seeking on the
+        // double tap or showing the UI on every touch here would undo that Back: it only hides the UI.
+        if (RayNeoDeviceUtil.isRayNeoDevice()) {
+            return;
+        }
+
+        if (mDoubleTapPlayerAdapter != null && !isOverlayShown()) {
             boolean handled = mDoubleTapPlayerAdapter.onTouchEvent(event);
 
             if (handled)
