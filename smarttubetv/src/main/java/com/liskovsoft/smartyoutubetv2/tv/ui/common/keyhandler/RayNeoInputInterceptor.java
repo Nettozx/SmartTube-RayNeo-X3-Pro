@@ -6,6 +6,8 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.leanback.widget.TitleView;
+
 import com.ffalcon.mercury.android.sdk.touch.CommonTouchCallback;
 import com.ffalcon.mercury.android.sdk.touch.FlingArgs;
 import com.ffalcon.mercury.android.sdk.touch.TouchDispatcher;
@@ -39,6 +41,9 @@ public class RayNeoInputInterceptor {
     private float mLastDeltaX = 0f;
     private float mLastDeltaY = 0f;
     private boolean mInjectedContinuousThisSwipe = false;
+    // Title bar (search/account orbs): one step per swipe, or the burst overshoots into the rows
+    private volatile boolean mFocusInTitleBar = false;
+    private boolean mOneStepSwipe = false;
 
     public RayNeoInputInterceptor(Activity activity) {
         mActivity = activity;
@@ -79,6 +84,7 @@ public class RayNeoInputInterceptor {
                 mLastDeltaX = 0f;
                 mLastDeltaY = 0f;
                 mInjectedContinuousThisSwipe = false;
+                mOneStepSwipe = mFocusInTitleBar;
             }
 
             mTouchDispatcher.onMotionEvent(event, mTouchCallback);
@@ -173,6 +179,10 @@ public class RayNeoInputInterceptor {
     }
 
     private void handleContinuous(float delta, boolean vertical) {
+        if (mOneStepSwipe && mInjectedContinuousThisSwipe) {
+            return;
+        }
+
         if (vertical) {
             float step = delta - mLastDeltaY;
             mLastDeltaY = delta;
@@ -202,6 +212,23 @@ public class RayNeoInputInterceptor {
                 mAccumulatedDeltaX = 0f;
             }
         }
+    }
+
+    /**
+     * Remember whether focus is in the title bar after each injected key. Read on the next touch down,
+     * since by then touch mode may already have cleared focus. Must run on the UI thread.
+     */
+    private void updateFocusState() {
+        View focus = mActivity.getWindow() != null ? mActivity.getWindow().getCurrentFocus() : null;
+        boolean inTitleBar = false;
+        for (View view = focus; view != null; view = view.getParent() instanceof View ? (View) view.getParent() : null) {
+            if (view instanceof TitleView) {
+                inTitleBar = true;
+                break;
+            }
+        }
+        mFocusInTitleBar = inTitleBar;
+        android.util.Log.d(TAG, "Focus after key: " + (focus != null ? focus.getClass().getSimpleName() : "none") + (inTitleBar ? " (title bar)" : ""));
     }
 
     private void injectClick() {
@@ -252,6 +279,8 @@ public class RayNeoInputInterceptor {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
                     inst.sendKeyDownUpSync(KeyEvent.KEYCODE_ENTER);
                 }
+
+                mActivity.runOnUiThread(this::updateFocusState);
             } catch (Throwable e) {
                 // Fallback to direct dispatch on UI thread if instrumentation fails
                 mActivity.runOnUiThread(() -> {
@@ -263,6 +292,7 @@ public class RayNeoInputInterceptor {
                     KeyEvent upEvent = new KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode, 0, 0, -1, 0, 0, android.view.InputDevice.SOURCE_DPAD);
                     mActivity.dispatchKeyEvent(downEvent);
                     mActivity.dispatchKeyEvent(upEvent);
+                    updateFocusState();
                 });
             }
         });
